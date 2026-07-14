@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<robot
+    xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <xacro:macro name="tof_sensor" params="sensor_id">
+        <link name="tof_sensor_${sensor_id}_link">
+            <visual>
+                <geometry>
+                    <box size="0.002 0.02 0.02" />
+                </geometry>
+                <origin xyz="0 0 0" rpy="0 0 0" />
+                <material name="grey" />
+            </visual>
+        </link>
+    </xacro:macro>
+
+    <material name="blue">
+        <color rgba="0 0 0.5 1" />
+    </material>
+
+    <material name="grey">
+        <color rgba="0.5 0.5 0.5 1" />
+    </material>
+
+
+    <xacro:property name="base_length" value="0.6" />
+    <xacro:property name="base_width" value="0.4" />
+    <xacro:property name="base_height" value="0.2" />
+
+    <link name="base_footprint" />
+
+    <link name="base_link">
+        <visual>
+            <geometry>
+                <box size="${base_length} ${base_width} ${base_height}" />
+            </geometry>
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <material name="blue" />
+        </visual>
+    </link>
+
+
+    <xacro:tof_sensor sensor_id="1"/>
+
+    <joint name="base_joint" type="fixed">
+        <parent link="base_footprint" />
+        <child link="base_link" />
+        <origin xyz="0 0 ${base_height / 2}" rpy="0 0 0"/>
+    </joint>
+
+    <joint name="base_tof_sensor_1_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="tof_sensor_1_link" />
+        <origin xyz="${base_length / 2} -0.05 0" rpy="0 0 0" />
+    </joint>
+
+    
+
+</robot>

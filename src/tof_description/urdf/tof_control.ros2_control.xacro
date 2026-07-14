@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <ros2_control name="MobileBaseHardwareInterface" type="sensor">
+        <hardware>
+            <plugin>tof_hardware/TofHardwareInterface</plugin>
+            <param name="port">/dev/ttyACM0</param>
+            <param name="baud_rate">115200</param>
+        </hardware>
+
+        <sensor name="base_tof_sensor_1_joint">
+            <state_interface name="range"></state_interface>
+        </sensor>
+
+    </ros2_control>
+
+</robot>

@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<robot name="tof_sensor"
+    xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:include filename="tof.xacro" />
+    <xacro:include filename="tof_control.ros2_control.xacro"/>
+
+</robot>

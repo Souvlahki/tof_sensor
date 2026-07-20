@@ -51,15 +51,9 @@ uint16_t crc16(const uint8_t *data, size_t length)
     return crc;
 }
 
-uint16_t TofSerial::CalculateChecksum(uint8_t sensor_id, uint16_t range)
+uint16_t TofSerial::CalculateChecksum(const uint8_t *data, size_t len)
 {
-    uint8_t data[3];
-
-    data[0] = sensor_id;
-    data[1] = range & 0xFF;
-    data[2] = range >> 8;
-
-    return crc16(data, 3);
+    return crc16(data, len);
 }
 
 void TofSerial::Init(const TofSerialConfig &config)
@@ -95,7 +89,7 @@ bool TofSerial::IsOpen() const
 
 TofReadStatus TofSerial::ProcessBuffer(TofPacket &out_packet) const
 {
-    uint8_t decoded[64];
+    uint8_t decoded[sizeof(TofPacket)];
 
     auto result = cobsr_decode(
         decoded,
@@ -116,7 +110,9 @@ TofReadStatus TofSerial::ProcessBuffer(TofPacket &out_packet) const
     TofPacket packet;
     std::memcpy(&packet, decoded, sizeof(packet));
 
-    if (packet.checksum != CalculateChecksum(packet.sensor_id, packet.range))
+    if (packet.checksum != CalculateChecksum(
+                               reinterpret_cast<const uint8_t *>(&packet),
+                               offsetof(TofPacket, checksum)))
     {
         return TofReadStatus::ChecksumError;
     }

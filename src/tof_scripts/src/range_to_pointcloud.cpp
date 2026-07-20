@@ -19,7 +19,6 @@ public:
         pointcloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/tof_cloud_1", 10);
 
         RCLCPP_INFO(this->get_logger(), "ToF Range-to-PointCloud converter initialized.");
-        RCLCPP_INFO(this->get_logger(), "HELLO");
     }
 
 private:

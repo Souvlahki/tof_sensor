@@ -20,6 +20,10 @@ struct TofPacket
 {
     uint8_t sensor_id;
     uint16_t range; // mm
+    uint16_t mode;
+    uint16_t calibraion;
+    uint16_t sample_rate;
+    uint32_t error;
     uint16_t checksum;
 };
 #pragma pack(pop)
@@ -56,7 +60,7 @@ public:
 
     TofReadStatus ReadPacket(TofPacket &out_packet);
 
-    static uint16_t CalculateChecksum(uint8_t sensor_id, uint16_t range);
+    static uint16_t CalculateChecksum(const uint8_t *data, size_t len);
 
 private:
     static LibSerial::BaudRate BaudRateFromInt(int baud);

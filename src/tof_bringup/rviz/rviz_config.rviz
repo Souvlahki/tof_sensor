@@ -6,6 +6,9 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
+        - /RobotModel1
+        - /RobotModel1/Links1
+        - /RobotModel1/Links1/base_link1
         - /TF1/Frames1
         - /Map1
         - /Map1/Topic1
@@ -75,7 +78,7 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
         base_link:
-          Alpha: 1
+          Alpha: 0
           Show Axes: false
           Show Trail: false
           Value: true

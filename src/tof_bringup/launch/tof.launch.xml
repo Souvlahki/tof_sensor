@@ -15,7 +15,7 @@
 
     <node pkg="controller_manager" exec="spawner" args="joint_state_broadcaster" />
     <node pkg="controller_manager" exec="spawner" args="range_sensor_broadcaster" />
-
+    <node pkg="controller_manager" exec="spawner" args="gpio_controller" />
     <node pkg="tof_scripts" exec="range_to_pointcloud" />
 
     <node pkg="nav2_costmap_2d" exec="nav2_costmap_2d" name="local_costmap" output="screen">

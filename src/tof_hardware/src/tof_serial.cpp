@@ -1,6 +1,6 @@
 #include "tof_hardware/tof_serial.hpp"
 
-#include <cstring>
+#include<cstring>
 #include <stdexcept>
 #include <cstdint>
 #include "tof_hardware/cobsr.h"
@@ -31,29 +31,23 @@ LibSerial::BaudRate TofSerial::BaudRateFromInt(int baud)
     }
 }
 
-uint16_t crc16(const uint8_t *data, size_t length)
+uint32_t TofSerial::CalculateChecksum(const uint8_t *data, size_t len)
 {
-    uint16_t crc = 0xFFFF;
+    uint32_t crc = 0xFFFFFFFFu;
+    size_t word_count = len / 4; // len must be a multiple of 4 — see note below
 
-    while (length--)
+    for (size_t i = 0; i < word_count; i++)
     {
-        crc ^= static_cast<uint16_t>(*data++) << 8;
+        uint32_t word = (uint32_t)data[i * 4] | ((uint32_t)data[i * 4 + 1] << 8) | ((uint32_t)data[i * 4 + 2] << 16) | ((uint32_t)data[i * 4 + 3] << 24);
 
-        for (int i = 0; i < 8; i++)
+        crc ^= word;
+        for (int bit = 0; bit < 32; bit++)
         {
-            if (crc & 0x8000)
-                crc = (crc << 1) ^ 0x1021;
-            else
-                crc <<= 1;
+            crc = (crc & 0x80000000u) ? (crc << 1) ^ 0x04C11DB7u : (crc << 1);
         }
     }
 
     return crc;
-}
-
-uint16_t TofSerial::CalculateChecksum(const uint8_t *data, size_t len)
-{
-    return crc16(data, len);
 }
 
 void TofSerial::Init(const TofSerialConfig &config)
@@ -87,9 +81,9 @@ bool TofSerial::IsOpen() const
     return port_.IsOpen();
 }
 
-TofReadStatus TofSerial::ProcessBuffer(TofPacket &out_packet) const
+TofReadStatus TofSerial::ProcessBuffer(TxFrame &out_frame) const
 {
-    uint8_t decoded[sizeof(TofPacket)];
+    uint8_t decoded[sizeof(TxFrame)];
 
     auto result = cobsr_decode(
         decoded,
@@ -102,26 +96,26 @@ TofReadStatus TofSerial::ProcessBuffer(TofPacket &out_packet) const
         return TofReadStatus::DecodeError;
     }
 
-    if (result.out_len != sizeof(TofPacket))
+    if (result.out_len != sizeof(TxFrame))
     {
         return TofReadStatus::DecodeError;
     }
 
-    TofPacket packet;
-    std::memcpy(&packet, decoded, sizeof(packet));
+    TxFrame frame;
+    std::memcpy(&frame, decoded, sizeof(frame));
 
-    if (packet.checksum != CalculateChecksum(
-                               reinterpret_cast<const uint8_t *>(&packet),
-                               offsetof(TofPacket, checksum)))
+    if (frame.checksum != CalculateChecksum(
+                              reinterpret_cast<const uint8_t *>(&frame),
+                              offsetof(TxFrame, checksum)))
     {
         return TofReadStatus::ChecksumError;
     }
 
-    out_packet = packet;
+    out_frame = frame;
     return TofReadStatus::Packet;
 }
 
-TofReadStatus TofSerial::ReadPacket(TofPacket &out_packet)
+TofReadStatus TofSerial::ReadPacket(TxFrame &out_frame)
 {
     while (port_.IsDataAvailable())
     {
@@ -150,7 +144,7 @@ TofReadStatus TofSerial::ReadPacket(TofPacket &out_packet)
                 continue;
             }
 
-            const TofReadStatus status = ProcessBuffer(out_packet);
+            const TofReadStatus status = ProcessBuffer(out_frame);
             rx_buffer_.clear();
 
             if (status == TofReadStatus::Packet)
@@ -165,10 +159,50 @@ TofReadStatus TofSerial::ReadPacket(TofPacket &out_packet)
         rx_buffer_.push_back(b);
 
         // Protect against losing synchronization.
-        if (rx_buffer_.size() > 64)
+        if (rx_buffer_.size() > sizeof(TxFrame) + 8)
         {
             rx_buffer_.clear();
         }
     }
     return TofReadStatus::NoPacket;
+}
+
+bool TofSerial::SendData(const RxFrame &frame_in)
+{
+    if (!port_.IsOpen())
+    {
+        return false;
+    }
+
+    RxFrame frame = frame_in;
+    frame.checksum = CalculateChecksum(
+        reinterpret_cast<const uint8_t *>(&frame),
+        offsetof(RxFrame, checksum));
+
+    cobsr_encode_result res = cobsr_encode(
+        tx_buf_, sizeof(tx_buf_),
+        reinterpret_cast<const uint8_t *>(&frame), sizeof(frame));
+
+    if (res.status != COBSR_ENCODE_OK)
+    {
+        return false;
+    }
+
+    tx_buf_[res.out_len] = 0x00; // COBS-R frame delimiter
+
+    LibSerial::DataBuffer out(tx_buf_, tx_buf_ + res.out_len + 1);
+
+    try
+    {
+        for (size_t i = 0; i < res.out_len + 1; ++i)
+        {
+            port_.WriteByte(static_cast<char>(tx_buf_[i]));
+        }
+    }
+    catch (const std::exception &)
+    {
+        return false;
+    }
+
+    return true;
 }

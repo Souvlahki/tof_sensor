@@ -11,6 +11,11 @@
 #define SENSOR_INIT_CALIBRATION 16.0
 #define SENSOR_INIT_SAMPLE_RATE_HZ 10.0
 
+#define ENCODER_TICKS 6000
+#define INITIAL_Kp 0.005
+#define INITIAL_Ki 0.023
+#define REDUCTION_RATION 15
+
 namespace tof_hardware
 {
 
@@ -39,16 +44,12 @@ namespace tof_hardware
         TofSerialConfig cfg_;
         TofSerial serial_;
 
-        // header — add as a private member
-        struct CachedSettings
+        struct CachedMotorData
         {
-            double mode = std::numeric_limits<double>::quiet_NaN();
-            double calibration = std::numeric_limits<double>::quiet_NaN();
-            double sample_rate = std::numeric_limits<double>::quiet_NaN();
-            double needs_calibration = std::numeric_limits<double>::quiet_NaN();
-            bool initialized = false;
+            int32_t last_tick;
         };
-        CachedSettings last_sent_;
+
+        CachedMotorData cached_motor_data_[MOTOR_SAYISI];
     };
 
 } // namespace tof_hardware

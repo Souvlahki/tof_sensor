@@ -7,14 +7,13 @@
         <param name="robot_description" value="$(command 'xacro $(var urdf_path)')" />
     </node>
 
-    <node pkg="tf2_ros" exec="static_transform_publisher" args="--x 0 --y 0 --z 0 --roll 0 --pitch 0 --yaw 0 --frame-id odom --child-frame-id base_footprint" />
-
     <node pkg="controller_manager" exec="ros2_control_node">
         <param from="$(find-pkg-share tof_bringup)/config/tof_controller.yaml" />
     </node>
 
     <node pkg="controller_manager" exec="spawner" args="joint_state_broadcaster" />
     <node pkg="controller_manager" exec="spawner" args="range_sensor_broadcaster" />
+    <node pkg="controller_manager" exec="spawner" args="diff_drive_controller"/>
     <node pkg="controller_manager" exec="spawner" args="gpio_controller" />
     <node pkg="tof_scripts" exec="range_to_pointcloud" />
 

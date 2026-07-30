@@ -28,6 +28,7 @@ struct PidSettings
 {
     float kp;
     float ki;
+    bool has_changed;
 };
 
 struct TofSettings

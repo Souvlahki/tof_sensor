@@ -1,6 +1,9 @@
 <?xml version="1.0"?>
-<robot
-    xmlns:xacro="http://www.ros.org/wiki/xacro">
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+
+    <xacro:property name="wheel_radius" value="0.1" />
+    <xacro:property name="wheel_length" value="0.05"/>
 
     <xacro:macro name="tof_sensor" params="sensor_id">
         <link name="tof_sensor_${sensor_id}_link">
@@ -13,6 +16,19 @@
             </visual>
         </link>
     </xacro:macro>
+
+    <xacro:macro name="wheel" params="prefix">
+        <link name="${prefix}_wheel_link">
+            <visual>
+                <geometry>
+                    <cylinder length="${wheel_length}" radius="${wheel_radius}" />
+                </geometry>
+                <origin xyz="0 0 0" rpy="${pi / 2} 0 0" />
+                <material name="grey" />
+            </visual>
+        </link>
+    </xacro:macro>
+
 
     <material name="blue">
         <color rgba="0 0 0.5 1" />
@@ -41,19 +57,33 @@
 
 
     <xacro:tof_sensor sensor_id="1"/>
+    <xacro:wheel prefix="left" />
+    <xacro:wheel prefix="right" />
 
     <joint name="base_joint" type="fixed">
         <parent link="base_footprint" />
         <child link="base_link" />
-        <origin xyz="0 0 ${base_height / 2}" rpy="0 0 0"/>
+        <origin xyz="0 0 ${base_height}" rpy="0 0 0"/>
     </joint>
 
     <joint name="base_tof_sensor_1_joint" type="fixed">
         <parent link="base_link"/>
         <child link="tof_sensor_1_link" />
-        <origin xyz="${base_length / 2} -0.05 0" rpy="0 0 0" />
+        <origin xyz="${base_length / 2} 0 0" rpy="0 0 0" />
     </joint>
 
-    
+    <joint name="base_left_wheel_joint" type="continuous">
+        <parent link="base_link" />
+        <child link="left_wheel_link" />
+        <origin xyz="0 ${-base_width / 2  - wheel_length / 2} ${-base_height / 2}" rpy="0 0 0" />
+        <axis xyz="0 1 0"/>
+    </joint>
+
+    <joint name="base_right_wheel_joint" type="continuous">
+        <parent link="base_link" />
+        <child link="right_wheel_link" />
+        <origin xyz="0 ${(base_width / 2) + wheel_length / 2} ${-base_height / 2}" rpy="0 0 0" />
+        <axis xyz="0 1 0"/>
+    </joint>
 
 </robot>

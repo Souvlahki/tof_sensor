@@ -5,6 +5,9 @@ controller_manager:
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
+    diff_drive_controller:
+      type: diff_drive_controller/DiffDriveController
+
     range_sensor_broadcaster:
       type: range_sensor_broadcaster/RangeSensorBroadcaster
 
@@ -24,6 +27,8 @@ gpio_controller:
   ros__parameters:
     gpios:
       - base_tof_sensor_1_settings
+      - pid_settings
+      - motor_data
 
     command_interfaces:
       base_tof_sensor_1_settings:
@@ -33,6 +38,11 @@ gpio_controller:
           - sample_rate
           - needs_calibration
 
+      pid_settings:
+        interfaces:
+          - Kp
+          - Ki
+
     state_interfaces:
       base_tof_sensor_1_settings:
         interfaces:
@@ -40,3 +50,44 @@ gpio_controller:
           - calibration
           - sample_rate
           - needs_calibration
+
+      pid_settings:
+        interfaces:
+          - Kp
+          - Ki
+          
+      motor_data:
+        interfaces:
+          - left_requested_vel  
+          - left_calculated_vel
+      
+
+diff_drive_controller:
+  ros__parameters:
+    left_wheel_names: ["base_left_wheel_joint"]
+    right_wheel_names: ["base_right_wheel_joint"]
+
+    wheel_separation: 0.30 # Distance between wheel centers (m)
+    wheel_radius: 0.05 
+
+    wheels_per_side: 1
+
+    publish_rate: 50.0
+
+    base_frame_id: base_footprint
+    odom_frame_id: odom
+
+    enable_odom_tf: true
+    velocity_rolling_window_size: 10
+
+    linear.x.has_velocity_limits: true
+    linear.x.max_velocity: 1.0
+    linear.x.min_velocity: -1.0
+    linear.x.has_acceleration_limits: true
+    linear.x.max_acceleration: 2.0
+
+    angular.z.has_velocity_limits: true
+    angular.z.max_velocity: 2.5
+    angular.z.min_velocity: -2.5
+    angular.z.has_acceleration_limits: true
+    angular.z.max_acceleration: 5.0

@@ -55,6 +55,15 @@
         </visual>
     </link>
 
+    <link name="caster_wheel_link">
+        <visual>
+            <geometry>
+                <sphere radius="0.05" />
+            </geometry>
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <material name="grey" />
+        </visual>
+    </link>
 
     <xacro:tof_sensor sensor_id="1"/>
     <xacro:wheel prefix="left" />
@@ -75,15 +84,21 @@
     <joint name="base_left_wheel_joint" type="continuous">
         <parent link="base_link" />
         <child link="left_wheel_link" />
-        <origin xyz="0 ${-base_width / 2  - wheel_length / 2} ${-base_height / 2}" rpy="0 0 0" />
+        <origin xyz="${-base_length / 4} ${-base_width / 2  - wheel_length / 2} ${-base_height / 2}" rpy="0 0 0" />
         <axis xyz="0 1 0"/>
     </joint>
 
     <joint name="base_right_wheel_joint" type="continuous">
         <parent link="base_link" />
         <child link="right_wheel_link" />
-        <origin xyz="0 ${(base_width / 2) + wheel_length / 2} ${-base_height / 2}" rpy="0 0 0" />
+        <origin xyz="${-base_length / 4} ${(base_width / 2) + wheel_length / 2} ${-base_height / 2}" rpy="0 0 0" />
         <axis xyz="0 1 0"/>
+    </joint>
+
+    <joint name="base_caster_wheel_joint" type="fixed">
+        <parent link="base_link" />
+        <child link="caster_wheel_link" />
+        <origin xyz="${base_length / 2 - 0.05} 0 ${-base_height / 2 -0.05}" rpy="0 0 0" />
     </joint>
 
 </robot>

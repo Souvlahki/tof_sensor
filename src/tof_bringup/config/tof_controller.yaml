@@ -16,7 +16,7 @@ controller_manager:
 
 range_sensor_broadcaster:
   ros__parameters:
-    sensor_name: "base_tof_sensor_1_joint"
+    sensor_name: "base_tof_sensor_1"
     frame_id: "tof_sensor_1_link"
     radiation_type: 1
     field_of_view: 0.467
@@ -55,12 +55,13 @@ gpio_controller:
         interfaces:
           - Kp
           - Ki
-          
+
       motor_data:
         interfaces:
-          - left_requested_vel  
+          - left_requested_vel
+          - right_requested_vel
           - left_calculated_vel
-      
+          - right_calculated_vel
 
 diff_drive_controller:
   ros__parameters:
@@ -68,7 +69,7 @@ diff_drive_controller:
     right_wheel_names: ["base_right_wheel_joint"]
 
     wheel_separation: 0.30 # Distance between wheel centers (m)
-    wheel_radius: 0.05 
+    wheel_radius: 0.05
 
     wheels_per_side: 1
 
@@ -81,8 +82,8 @@ diff_drive_controller:
     velocity_rolling_window_size: 10
 
     linear.x.has_velocity_limits: true
-    linear.x.max_velocity: 1.0
-    linear.x.min_velocity: -1.0
+    linear.x.max_velocity: 0.5
+    linear.x.min_velocity: -0.5
     linear.x.has_acceleration_limits: true
     linear.x.max_acceleration: 2.0
 

@@ -12,6 +12,23 @@ namespace tof_hardware
 
         const auto &info_ = params.hardware_info;
 
+        for (const auto &sensor : info_.sensors)
+        {
+            auto it = sensor.parameters.find("id");
+            if (it == sensor.parameters.end())
+            {
+                RCLCPP_WARN(rclcpp::get_logger("TofHardwareInterface"),
+                            "Sensor '%s' has no 'id' param, skipping", sensor.name.c_str());
+                continue;
+            }
+
+            TofSensorInterface tsi;
+            tsi.sensor_name = sensor.name;
+            tsi.sensor_id = std::stoi(it->second);
+
+            tof_sensors_.push_back(tsi);
+        }
+
         cfg_.port = info_.hardware_parameters.at("port");
         cfg_.baud_rate = std::stoi(info_.hardware_parameters.at("baud_rate"));
 
@@ -22,10 +39,15 @@ namespace tof_hardware
     TofHardwareInterface::on_configure(const rclcpp_lifecycle::State &previous_state)
     {
         (void)previous_state;
-        set_state("base_tof_sensor_1_settings/mode", SENSOR_INIT_MODE);
-        set_state("base_tof_sensor_1_settings/calibration", SENSOR_INIT_CALIBRATION);
-        set_state("base_tof_sensor_1_settings/sample_rate", SENSOR_INIT_SAMPLE_RATE_HZ);
-        set_state("base_tof_sensor_1_settings/needs_calibration", static_cast<double>(0.0));
+        for (const auto &ts : tof_sensors_)
+        {
+            set_state(ts.sensor_name + "/range", 0.0);
+
+            set_state(ts.sensor_name + "_settings/mode", SENSOR_INIT_MODE);
+            set_state(ts.sensor_name + "_settings/calibration", SENSOR_INIT_CALIBRATION);
+            set_state(ts.sensor_name + "_settings/sample_rate", SENSOR_INIT_SAMPLE_RATE_HZ);
+            set_state(ts.sensor_name + "_settings/needs_calibration", 0.0);
+        }
 
         set_state("base_left_wheel_joint/velocity", static_cast<double>(0.0));
         set_state("base_right_wheel_joint/velocity", static_cast<double>(0.0));
@@ -80,17 +102,34 @@ namespace tof_hardware
         TofReadStatus status;
         while ((status = serial_.ReadPacket(packet)) == TofReadStatus::Packet)
         {
+            for (int i = 0; i < SENSOR_COUNT; i++)
+            {
+                int sensor_id = packet.tof_packet[i].sensor_id;
 
-            set_state("base_tof_sensor_1_joint/range", static_cast<double>(packet.tof_packet[0].range) / 1000.0);
+                auto ts_it = std::find_if(tof_sensors_.begin(), tof_sensors_.end(),
+                                          [sensor_id](const TofSensorInterface &ts)
+                                          { return ts.sensor_id == sensor_id; });
+
+                if (ts_it == tof_sensors_.end())
+                    continue;
+
+                set_state(ts_it->sensor_name + "/range", static_cast<double>(packet.tof_packet[i].range) / 1000.0);
+
+                // settings-related telemetry (mode, calibration, sample_rate) mirrored back as state,
+                // under the derived "_settings" name
+                set_state(ts_it->sensor_name + "_settings/calibration", static_cast<double>(packet.tof_packet[i].calibration));
+                set_state(ts_it->sensor_name + "_settings/mode", static_cast<double>(packet.tof_packet[i].mode));
+                set_state(ts_it->sensor_name + "_settings/sample_rate", static_cast<double>(packet.tof_packet[i].sample_rate));
+            }
 
             for (int i = 0; i < MOTOR_SAYISI; i++)
             {
-                int32_t new_total = packet.motor_packet[i].ticks;                    
-                int32_t delta_ticks = new_total - cached_motor_data_[i].last_tick; 
-                cached_motor_data_[i].last_tick = new_total;                       
+                int32_t new_total = packet.motor_packet[i].ticks;
+                int32_t delta_ticks = new_total - cached_motor_data_[i].last_tick;
+                cached_motor_data_[i].last_tick = new_total;
 
-                double if_vel = static_cast<double>(delta_ticks) / ENCODER_TICKS / REDUCTION_RATION / period.seconds();
-                double if_pose = static_cast<double>(new_total) / ENCODER_TICKS / REDUCTION_RATION;
+                double if_vel = ((float)delta_ticks / ENCODER_TICKS) * 2.0 * M_PI / period.seconds();
+                double if_pose = ((float)new_total / ENCODER_TICKS) * 2.0 * M_PI;
 
                 if (packet.motor_packet[i].motor_id == 0)
                 {
@@ -100,7 +139,8 @@ namespace tof_hardware
                 }
                 else
                 {
-                    set_state("base_right_wheel_joint/velocity", if_vel); 
+                    set_state("base_right_wheel_joint/velocity", if_vel);
+                    set_state("motor_data/right_calculated_vel", if_vel);
                     set_state("base_right_wheel_joint/position", if_pose);
                 }
             }
@@ -116,54 +156,80 @@ namespace tof_hardware
         (void)period;
         bool tof_changed = false;
         bool pid_changed = false;
-        double mode = get_command("base_tof_sensor_1_settings/mode");
-        double calibration = get_command("base_tof_sensor_1_settings/calibration");
-        double sample_rate = get_command("base_tof_sensor_1_settings/sample_rate");
-        double needs_calibration = get_command("base_tof_sensor_1_settings/needs_calibration");
 
         double kp = get_command("pid_settings/Kp");
         double ki = get_command("pid_settings/Ki");
 
-        // RCLCPP_INFO(rclcpp::get_logger("debug"), "%lf %lf %lf %lf", mode, calibration, sample_rate, needs_calibration);
-
-        double last_mode = get_state("base_tof_sensor_1_settings/mode");
-        double last_calibration = get_state("base_tof_sensor_1_settings/calibration");
-        double last_sample_rate = get_state("base_tof_sensor_1_settings/sample_rate");
-        double last_needs_calibration = get_state("base_tof_sensor_1_settings/needs_calibration");
         double last_kp = get_state("pid_settings/Kp");
         double last_ki = get_state("pid_settings/Ki");
-        // RCLCPP_INFO(rclcpp::get_logger("debug"), "last: %lf %lf %lf %lf", last_mode, last_calibration, last_sample_rate, last_needs_calibration);
 
-        mode = std::isfinite(mode) ? mode : last_mode;
-        calibration = std::isfinite(calibration) ? calibration : last_calibration;
-        sample_rate = std::isfinite(sample_rate) ? sample_rate : last_sample_rate;
-        needs_calibration = std::isfinite(needs_calibration) ? needs_calibration : last_needs_calibration;
         kp = std::isfinite(kp) ? kp : last_kp;
         ki = std::isfinite(ki) ? ki : last_ki;
 
-
-        tof_changed =
-            mode != last_mode ||
-            calibration != last_calibration ||
-            sample_rate != last_sample_rate || needs_calibration != last_needs_calibration;
-
-
         pid_changed = kp != last_kp || ki != last_ki;
-            
 
         RxFrame frame{};
-        frame.tof_settings.sensor_id = static_cast<uint8_t>(1);
-        frame.tof_settings.mode = static_cast<uint16_t>(mode);
-        frame.tof_settings.calibration = static_cast<int16_t>(calibration);
-        frame.tof_settings.sample_rate = static_cast<uint16_t>(sample_rate);
-        frame.tof_settings.needs_calibration = static_cast<bool>(needs_calibration);
+
+        std::string changed_settings_name;
+        double changed_mode = 0, changed_calibration = 0, changed_sample_rate = 0, changed_needs_calibration = 0;
+
+        for (const auto &ts : tof_sensors_)
+        {
+            const std::string settings_name = ts.sensor_name + "_settings";
+
+            double mode = get_command(settings_name + "/mode");
+            double calibration = get_command(settings_name + "/calibration");
+            double sample_rate = get_command(settings_name + "/sample_rate");
+            double needs_calibration = get_command(settings_name + "/needs_calibration");
+
+            double last_mode = get_state(settings_name + "/mode");
+            double last_calibration = get_state(settings_name + "/calibration");
+            double last_sample_rate = get_state(settings_name + "/sample_rate");
+            double last_needs_calibration = get_state(settings_name + "/needs_calibration");
+
+            mode = std::isfinite(mode) ? mode : last_mode;
+            calibration = std::isfinite(calibration) ? calibration : last_calibration;
+            sample_rate = std::isfinite(sample_rate) ? sample_rate : last_sample_rate;
+            needs_calibration = std::isfinite(needs_calibration) ? needs_calibration : last_needs_calibration;
+
+            bool changed = mode != last_mode || calibration != last_calibration ||
+                           sample_rate != last_sample_rate || needs_calibration != last_needs_calibration;
+
+            if (!changed)
+                continue;
+
+            frame.tof_settings.sensor_id = static_cast<uint8_t>(ts.sensor_id);
+            frame.tof_settings.mode = static_cast<uint16_t>(mode);
+            frame.tof_settings.calibration = static_cast<int16_t>(calibration);
+            frame.tof_settings.sample_rate = static_cast<uint16_t>(sample_rate);
+            frame.tof_settings.needs_calibration = static_cast<bool>(needs_calibration);
+
+            changed_settings_name = settings_name;
+            changed_mode = mode;
+            changed_calibration = calibration;
+            changed_sample_rate = sample_rate;
+            changed_needs_calibration = needs_calibration;
+
+            tof_changed = true;
+            break; // only one sensor changes at a time
+        }
+
+        double right_cmd = get_command("base_right_wheel_joint/velocity");
+        double left_cmd = get_command("base_left_wheel_joint/velocity");
+
+        double right_vel = std::isfinite(right_cmd) ? right_cmd : 0.0;
+        double left_vel = std::isfinite(left_cmd) ? left_cmd : 0.0;
 
         frame.motor_telemetry[0].motor_id = 0;
-        frame.motor_telemetry[0].ticks = static_cast<int32_t>(get_command("base_left_wheel_joint/velocity") * REDUCTION_RATION * ENCODER_TICKS);
-        set_state("motor_data/left_requested_vel", get_command("base_left_wheel_joint/velocity"));
-        // RCLCPP_INFO(rclcpp::get_logger("send"), " sending ticks: %d ", frame.motor_telemetry[0].ticks);
+        frame.motor_telemetry[0].ticks = static_cast<int32_t>(
+            left_vel / (2.0 * M_PI) * ENCODER_TICKS);
+
+        set_state("motor_data/left_requested_vel", left_vel);
+
         frame.motor_telemetry[1].motor_id = 1;
-        frame.motor_telemetry[1].ticks = 0;
+        frame.motor_telemetry[1].ticks = static_cast<int32_t>(
+            right_vel / (2.0 * M_PI) * ENCODER_TICKS);
+        set_state("motor_data/right_requested_vel", right_vel);
 
         frame.pid_settings.ki = static_cast<float>(ki);
         frame.pid_settings.kp = static_cast<float>(kp);
@@ -173,24 +239,23 @@ namespace tof_hardware
             frame.tof_settings.has_changed = true;
         }
 
-        if(pid_changed) {
+        if (pid_changed)
+        {
             frame.pid_settings.has_changed = true;
         }
 
-        // RCLCPP_INFO(rclcpp::get_logger("debug"), "frame %d %d %d %d %d", frame.tof_settings.mode, frame.tof_settings.calibration, frame.tof_settings.sample_rate, frame.tof_settings.needs_calibration, frame.tof_settings.has_changed);
-
         if (serial_.SendData(frame))
         {
-            // RCLCPP_INFO(rclcpp::get_logger("send"), "sending data");
             if (tof_changed)
             {
-
-                set_state("base_tof_sensor_1_settings/mode", static_cast<double>(mode));
-                set_state("base_tof_sensor_1_settings/calibration", static_cast<double>(calibration));
-                set_state("base_tof_sensor_1_settings/sample_rate", static_cast<double>(sample_rate));
+                set_state(changed_settings_name + "/mode", changed_mode);
+                set_state(changed_settings_name + "/calibration", changed_calibration);
+                set_state(changed_settings_name + "/sample_rate", changed_sample_rate);
+                set_state(changed_settings_name + "/needs_calibration", changed_needs_calibration);
             }
 
-            if(pid_changed) {
+            if (pid_changed)
+            {
                 set_state("pid_settings/Kp", static_cast<double>(kp));
                 set_state("pid_settings/Ki", static_cast<double>(ki));
             }

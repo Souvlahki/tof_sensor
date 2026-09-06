@@ -12,12 +12,21 @@
 #define SENSOR_INIT_SAMPLE_RATE_HZ 10.0
 
 #define ENCODER_TICKS 6000
-#define INITIAL_Kp 0.005
-#define INITIAL_Ki 0.023
-#define REDUCTION_RATION 15
+#define INITIAL_Kp 0.0035
+#define INITIAL_Ki 0.007
 
 namespace tof_hardware
 {
+    struct CachedMotorData
+    {
+        int32_t last_tick;
+    };
+
+    struct TofSensorInterface
+    {
+        std::string sensor_name; // e.g. "base_tof_sensor_1_joint"
+        int sensor_id = -1;
+    };
 
     class TofHardwareInterface : public hardware_interface::SystemInterface
     {
@@ -44,12 +53,8 @@ namespace tof_hardware
         TofSerialConfig cfg_;
         TofSerial serial_;
 
-        struct CachedMotorData
-        {
-            int32_t last_tick;
-        };
-
         CachedMotorData cached_motor_data_[MOTOR_SAYISI];
+        std::vector<TofSensorInterface> tof_sensors_;
     };
 
 } // namespace tof_hardware

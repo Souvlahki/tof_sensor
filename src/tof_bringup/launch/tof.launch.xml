@@ -16,6 +16,7 @@
     <node pkg="controller_manager" exec="spawner" args="diff_drive_controller"/>
     <node pkg="controller_manager" exec="spawner" args="gpio_controller" />
     <node pkg="tof_scripts" exec="range_to_pointcloud" />
+    <node pkg="tof_scripts" exec="params_config" />
 
     <node pkg="nav2_costmap_2d" exec="nav2_costmap_2d" name="local_costmap" output="screen">
         <param from="$(var costmap_params_path)" />

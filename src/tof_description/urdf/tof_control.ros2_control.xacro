@@ -4,11 +4,12 @@
     <ros2_control name="MobileBaseHardwareInterface" type="system">
         <hardware>
             <plugin>tof_hardware/TofHardwareInterface</plugin>
-            <param name="port">/dev/ttyUSB1</param>
+            <param name="port">/dev/ttyUSB0</param>
             <param name="baud_rate">230400</param>
         </hardware>
 
-        <sensor name="base_tof_sensor_1_joint">
+        <sensor name="base_tof_sensor_1">
+            <param name="id">1</param>
             <state_interface name="range"></state_interface>
         </sensor>
 
@@ -45,7 +46,9 @@
 
         <gpio name="motor_data">
             <state_interface name="left_requested_vel"/>
+            <state_interface name="right_requested_vel"/>
             <state_interface name="left_calculated_vel"/>
+            <state_interface name="right_calculated_vel"/>
         </gpio>
     </ros2_control>
 
